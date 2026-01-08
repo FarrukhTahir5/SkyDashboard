@@ -7,15 +7,21 @@ import os
 app = FastAPI(title="SkyDashboard API")
 
 # Configure CORS
+frontend_url = os.getenv("FRONTEND_URL", "").rstrip("/")
 allowed_origins = [
-    os.getenv("FRONTEND_URL", "http://localhost:5173"),
+    frontend_url,
+    "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
+# Filter out empty strings if FRONTEND_URL wasn't set
+allowed_origins = [o for o in allowed_origins if o]
+
+is_production = os.getenv("ENVIRONMENT") == "production"
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins if os.getenv("ENVIRONMENT") == "production" else ["*"],
-    allow_credentials=True,
+    allow_origins=allowed_origins if is_production else ["*"],
+    allow_credentials=True if is_production else False, # Credentials cannot be True with ["*"]
     allow_methods=["*"],
     allow_headers=["*"],
 )
