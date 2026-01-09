@@ -1,113 +1,53 @@
 # Quick Start Guide - Jira Dashboard
 
 ## Prerequisites
-- Docker and Docker Compose installed
+- **Python 3.10+** installed
+- **Node.js 20+** and **npm** installed
 - Jira credentials (domain, email, API token)
 
 ## Setup Steps
 
 ### 1. Environment Configuration
-Make sure your `backend/.env` file has:
+Create a `.env` file in the `backend/` directory:
 ```env
 JIRA_DOMAIN=skyelectric.atlassian.net
 JIRA_EMAIL=your-email@skyelectric.com
 JIRA_API_TOKEN=your-api-token
 ```
 
-### 2. Start the Services
+### 2. Install Dependencies
 
+**Backend:**
 ```bash
-# From the SkyDashboard directory
-cd /home/farrukhtahir/Skyelectric/SkyDashboard
-
-# Start both backend and frontend
-docker compose up -d
-
-# Or start them separately:
-docker compose up -d backend
-docker compose up -d frontend
+cd backend
+pip install -r requirements.txt
 ```
 
-### 3. Verify Services are Running
-
+**Frontend:**
 ```bash
-# Check status
-docker compose ps
-
-# Should show:
-# skydashboard-backend   running   0.0.0.0:8000->8000/tcp
-# skydashboard-frontend  running   0.0.0.0:5173->5173/tcp
+cd frontend
+npm install
 ```
 
-### 4. Access the Dashboard
+### 3. Start the Services (Development Mode)
 
-- **Frontend**: http://localhost:5173
-- **Backend API**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
-
-### 5. Test New Endpoints
-
-```bash
-# Test project ID lookup
-curl http://localhost:8000/api/project/HVP/id
-
-# Test boards by project ID
-curl http://localhost:8000/api/project/10112/boards
-
-# Test recent bugs
-curl "http://localhost:8000/api/bugs/recent?project_id=10112&days=30"
-```
-
-## Troubleshooting
-
-### Backend not starting
-```bash
-# View logs
-docker compose logs backend
-
-# Restart backend
-docker compose restart backend
-```
-
-### Frontend not starting
-```bash
-# View logs
-docker compose logs frontend
-
-# Restart frontend
-docker compose restart frontend
-```
-
-### Docker daemon not running
-```bash
-# Start Docker daemon (Ubuntu/Debian)
-sudo systemctl start docker
-
-# Or on other systems
-sudo service docker start
-```
-
-## Using the Bug Reporting Widget
-
-1. **Select a Project** - Use the project dropdown
-2. **Widget will auto-load** - Shows bugs from last 30 days
-3. **Change time period** - Select 15, 30, or 60 days
-4. **Filter by board** - Optional board selection
-5. **Click on bugs** - Opens Jira issue in new tab
-
-## Development Mode
-
-### Backend (with hot reload)
+**Start Backend (Terminal 1):**
 ```bash
 cd backend
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### Frontend (with hot reload)
+**Start Frontend (Terminal 2):**
 ```bash
 cd frontend
 npm run dev
 ```
+
+### 4. Access the Dashboard
+- **Frontend**: http://localhost:5173
+- **Backend API**: http://localhost:8000
+- **API Docs**: http://localhost:8000/docs
+
 
 ## Next Steps
 

@@ -9,9 +9,9 @@ export function BoardQualityChart({ projectId }) {
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
+    const fetchData = (isSilent = false) => {
         if (!projectId) return;
-        setLoading(true);
+        if (!isSilent) setLoading(true);
         axios.get(`${API_URL}/api/dashboard/board-quality?project_id=${projectId}`)
             .then(res => {
                 setData(res.data);
@@ -21,6 +21,12 @@ export function BoardQualityChart({ projectId }) {
                 setData([]);
             })
             .finally(() => setLoading(false));
+    };
+
+    useEffect(() => {
+        fetchData();
+        const interval = setInterval(() => fetchData(true), 60000);
+        return () => clearInterval(interval);
     }, [projectId]);
 
     const CustomTooltip = ({ active, payload, label }) => {
@@ -54,7 +60,7 @@ export function BoardQualityChart({ projectId }) {
                     <div className="p-1.5 bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-md">
                         <CheckCircle2 size={18} />
                     </div>
-                    <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-100 uppercase tracking-tight">Resolution Timeliness & SLA Compliance</CardTitle>
+                    <CardTitle className="text-[clamp(11px,1cqi,13px)] font-black text-black dark:text-white uppercase tracking-tight">Resolution Timeliness & SLA Compliance</CardTitle>
                 </div>
             </CardHeader>
             <CardContent className="flex-1 p-2">
@@ -69,18 +75,18 @@ export function BoardQualityChart({ projectId }) {
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" className="text-slate-100 dark:text-slate-800" />
                                 <XAxis
                                     dataKey="name"
-                                    tick={{ fontSize: 10, fontWeight: 600, fill: 'currentColor' }}
-                                    className="text-slate-500 dark:text-slate-400"
+                                    tick={{ fontSize: 'clamp(9px,0.8cqi,11px)', fontWeight: 800, fill: 'currentColor' }}
+                                    className="text-black dark:text-white"
                                     axisLine={false}
                                     tickLine={false}
                                 />
                                 <YAxis
                                     yAxisId="left"
-                                    tick={{ fontSize: 10, fill: 'currentColor' }}
-                                    className="text-slate-400 dark:text-slate-500"
+                                    tick={{ fontSize: 'clamp(9px,0.8cqi,11px)', fill: 'currentColor', fontWeight: 800 }}
+                                    className="text-black dark:text-white"
                                     axisLine={false}
                                     tickLine={false}
-                                    label={{ value: 'Bugs Count', angle: -90, position: 'insideLeft', style: { fontSize: 10, fill: 'currentColor' }, className: 'text-slate-400' }}
+                                    label={{ value: 'Bugs Count', angle: -90, position: 'insideLeft', style: { fontSize: 'clamp(9px,0.8cqi,11px)', fill: 'currentColor', fontWeight: 900 }, className: 'text-black dark:text-white' }}
                                 />
                                 <YAxis
                                     yAxisId="right"
@@ -88,7 +94,7 @@ export function BoardQualityChart({ projectId }) {
                                     tick={{ fontSize: 10, fill: '#f59e0b' }}
                                     axisLine={false}
                                     tickLine={false}
-                                    label={{ value: 'Hours to Fix', angle: 90, position: 'insideRight', style: { fontSize: 10, fill: '#f59e0b' } }}
+                                    label={{ value: 'Hours to Fix', angle: 90, position: 'insideRight', style: { fontSize: 'clamp(9px,0.8cqi,11px)', fill: '#f59e0b', fontWeight: 800 } }}
                                 />
                                 <Tooltip
                                     cursor={{ fill: 'currentColor', className: 'text-slate-50/50 dark:text-slate-900/30' }}
@@ -98,7 +104,13 @@ export function BoardQualityChart({ projectId }) {
                                     verticalAlign="top"
                                     align="center"
                                     iconType="circle"
-                                    wrapperStyle={{ fontSize: '10px', paddingBottom: '20px', fontWeight: 'bold', textTransform: 'uppercase' }}
+                                    wrapperStyle={{
+                                        fontSize: 'clamp(9px,0.8cqi,11px)',
+                                        paddingBottom: '20px',
+                                        fontWeight: 900,
+                                        textTransform: 'uppercase'
+                                    }}
+                                    formatter={(value) => <span className="text-black dark:text-white tracking-widest">{value}</span>}
                                 />
                                 <Bar yAxisId="left" dataKey="actual" name="Actual Bug" stackId="a" fill="#10b981" radius={[0, 0, 0, 0]} barSize={40} />
                                 <Bar yAxisId="left" dataKey="invalid" name="Not a Bug" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]} barSize={40} />

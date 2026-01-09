@@ -11,9 +11,9 @@ export function BugAssignmentFlow({ projectId, projectKey, defaultView = 'flow',
     const [loading, setLoading] = useState(false);
     const [viewMode, setViewMode] = useState(defaultView); // 'flow' or 'reporter'
 
-    useEffect(() => {
+    const fetchData = (isSilent = false) => {
         if (!projectId) return;
-        setLoading(true);
+        if (!isSilent) setLoading(true);
         axios.get(`${API_URL}/api/dashboard/bug-flow?project_id=${projectId}`)
             .then(res => {
                 setRawData(res.data);
@@ -23,6 +23,12 @@ export function BugAssignmentFlow({ projectId, projectKey, defaultView = 'flow',
                 setRawData([]);
             })
             .finally(() => setLoading(false));
+    };
+
+    useEffect(() => {
+        fetchData();
+        const interval = setInterval(() => fetchData(true), 60000);
+        return () => clearInterval(interval);
     }, [projectId]);
 
     const chartData = useMemo(() => {

@@ -17,9 +17,9 @@ export function RecentIssuesAndSeverity({ projectId, projectKey, boardId, sprint
 
     const issueTypes = ["Bug", "Task", "Sub-task", "Story", "Epic"];
 
-    const fetchData = async () => {
+    const fetchData = async (isSilent = false) => {
         if (!projectId) return;
-        setLoading(true);
+        if (!isSilent) setLoading(true);
         try {
             // Fetch Recent Issues
             let issuesUrl = `${API_URL}/api/issues/recent?project_id=${projectId}&days=${timePeriod}&issue_type=${issueType}`;
@@ -54,6 +54,8 @@ export function RecentIssuesAndSeverity({ projectId, projectKey, boardId, sprint
 
     useEffect(() => {
         fetchData();
+        const interval = setInterval(() => fetchData(true), 60000);
+        return () => clearInterval(interval);
     }, [projectId, boardId, sprintId, timePeriod, issueType, unresolvedOnly]);
 
     const handleIssueClick = (issueKey) => {
@@ -142,7 +144,7 @@ export function RecentIssuesAndSeverity({ projectId, projectKey, boardId, sprint
                             <Layers size={18} />
                         </div>
                         <div>
-                            <CardTitle className={`${compact ? 'text-sm' : 'text-lg'} font-bold text-slate-800 dark:text-slate-100 uppercase tracking-tight`}>Operational Traceability & Audit Log</CardTitle>
+                            <CardTitle className={`${compact ? 'text-sm' : 'text-[clamp(14px,1.5cqi,18px)]'} font-black text-black dark:text-white uppercase tracking-tight`}>Operational Traceability & Audit Log</CardTitle>
                             {!compact && (
                                 <p className="text-xs text-muted-foreground dark:text-slate-500 mt-0.5">
                                     Unified view for <span className="font-semibold text-slate-700 dark:text-slate-300">{projectKey}</span>
@@ -189,7 +191,7 @@ export function RecentIssuesAndSeverity({ projectId, projectKey, boardId, sprint
                     {/* Timeline (left 3/5) */}
                     <div className="lg:col-span-3 flex flex-col space-y-2">
                         <div className="flex items-center justify-between">
-                            <h4 className="text-[11px] font-bold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors flex items-center gap-1.5 uppercase tracking-wider">
+                            <h4 className="text-[clamp(11px,1cqi,13px)] font-black text-black dark:text-white transition-colors flex items-center gap-1.5 uppercase tracking-wider">
                                 <Calendar size={13} className="text-blue-500" /> Defect Aging Analysis
                             </h4>
                             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/50">
@@ -207,8 +209,8 @@ export function RecentIssuesAndSeverity({ projectId, projectKey, boardId, sprint
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" className="text-slate-100 dark:text-slate-800" />
                                         <XAxis
                                             dataKey="date"
-                                            tick={{ fontSize: 9, fill: 'currentColor' }}
-                                            className="text-slate-400 dark:text-slate-500"
+                                            tick={{ fontSize: 'clamp(9px,0.8cqi,11px)', fill: 'currentColor', fontWeight: 800 }}
+                                            className="text-black dark:text-white"
                                             axisLine={false}
                                             tickLine={false}
                                             tickFormatter={(val) => {
@@ -216,7 +218,7 @@ export function RecentIssuesAndSeverity({ projectId, projectKey, boardId, sprint
                                                 return `${d.getMonth() + 1}/${d.getDate()}`;
                                             }}
                                         />
-                                        <YAxis tick={{ fontSize: 9, fill: 'currentColor' }} className="text-slate-400 dark:text-slate-500" axisLine={false} tickLine={false} />
+                                        <YAxis tick={{ fontSize: 'clamp(9px,0.8cqi,11px)', fill: 'currentColor', fontWeight: 800 }} className="text-black dark:text-white" axisLine={false} tickLine={false} />
                                         <RechartsTooltip content={<CustomTimelineTooltip />} />
                                         <Line
                                             type="monotone"
@@ -239,7 +241,7 @@ export function RecentIssuesAndSeverity({ projectId, projectKey, boardId, sprint
                     {/* Pie Chart (right 2/5) */}
                     <div className="lg:col-span-2 flex flex-col space-y-2">
                         <div className="flex items-center justify-between">
-                            <h4 className="text-[11px] font-bold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors flex items-center gap-1.5 uppercase tracking-wider">
+                            <h4 className="text-[clamp(11px,1cqi,13px)] font-black text-black dark:text-white transition-colors flex items-center gap-1.5 uppercase tracking-wider">
                                 <Bug size={13} className="text-red-500" /> Quality Risk Index (QRI)
                             </h4>
                             <div className="flex items-center gap-1.5">
@@ -282,9 +284,9 @@ export function RecentIssuesAndSeverity({ projectId, projectKey, boardId, sprint
                                             verticalAlign="bottom"
                                             align="center"
                                             iconType="circle"
-                                            wrapperStyle={{ fontSize: '8px', paddingTop: '10px' }}
+                                            wrapperStyle={{ fontSize: 'clamp(8px,0.8cqi,10px)', paddingTop: '10px' }}
                                             formatter={(value) => (
-                                                <span className="text-[8px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-tighter">
+                                                <span className="text-[clamp(9px,0.8cqi,11px)] font-black text-black dark:text-white uppercase tracking-tighter">
                                                     {value}
                                                 </span>
                                             )}
@@ -305,13 +307,13 @@ export function RecentIssuesAndSeverity({ projectId, projectKey, boardId, sprint
                     <div className="space-y-4 pt-4 border-t border-slate-50 dark:border-slate-800">
                         <div className="flex items-center gap-2">
                             <AlertCircle size={14} className="text-slate-400 dark:text-slate-500" />
-                            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Change Log Compliance</span>
+                            <span className="text-[clamp(10px,1cqi,12px)] font-black text-black dark:text-white uppercase tracking-wider">Change Log Compliance</span>
                         </div>
                         {issueData.issues.length > 0 ? (
                             <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm bg-white dark:bg-slate-950">
                                 <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
                                     <table className="w-full text-xs text-left">
-                                        <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold border-b dark:border-slate-700 sticky top-0 z-10 uppercase tracking-tighter">
+                                        <thead className="bg-slate-50 dark:bg-slate-800 text-black dark:text-white font-black border-b dark:border-slate-700 sticky top-0 z-10 uppercase tracking-tighter">
                                             <tr>
                                                 <th className="p-3">Key</th>
                                                 <th className="p-3">Summary</th>
@@ -327,9 +329,9 @@ export function RecentIssuesAndSeverity({ projectId, projectKey, boardId, sprint
                                                     onClick={() => handleIssueClick(issue.key)}
                                                 >
                                                     <td className="p-3 font-bold text-blue-600 dark:text-blue-400 group-hover:underline">{issue.key}</td>
-                                                    <td className="p-3 text-slate-700 dark:text-slate-300 max-w-xs md:max-w-md">
-                                                        <p className="font-semibold truncate">{issue.summary}</p>
-                                                        <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate mt-0.5">{issue.reporter}</p>
+                                                    <td className="p-3 text-black dark:text-white max-w-xs md:max-w-md">
+                                                        <p className="font-bold truncate">{issue.summary}</p>
+                                                        <p className="text-[10px] text-slate-600 dark:text-slate-500 font-medium truncate mt-0.5">{issue.reporter}</p>
                                                     </td>
                                                     <td className="p-3">
                                                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${issue.priority === 'High' || issue.priority === 'Highest'
@@ -341,7 +343,7 @@ export function RecentIssuesAndSeverity({ projectId, projectKey, boardId, sprint
                                                             {issue.priority}
                                                         </span>
                                                     </td>
-                                                    <td className="p-3 text-slate-400 dark:text-slate-500 font-medium">
+                                                    <td className="p-3 text-slate-700 dark:text-slate-400 font-bold">
                                                         {getRelativeTime(issue.created)}
                                                     </td>
                                                 </tr>

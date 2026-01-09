@@ -37,21 +37,41 @@ We recommend **Render** or **Railway** for free Python hosting.
     - `ENVIRONMENT`: `production`
     - `FRONTEND_URL`: (Your Vercel URL - add this AFTER the frontend is deployed)
 
-## 3. Frontend Deployment (React + Vite) ⚛️
+## 4. Self-Hosting on a Linux Server 🖥️
+If you are deploying on your own server instead of a cloud provider, follow these manual steps. **Docker is not required.**
 
-We recommend **Vercel** for the fastest React hosting.
+### Backend (FastAPI)
+1.  **Environment**: Ensure Python 3.10+ is installed.
+2.  **Dependencies**: 
+    ```bash
+    cd backend
+    pip install -r requirements.txt
+    ```
+3.  **Run**: Use `pm2` or a systemd service to keep the process alive.
+    ```bash
+    uvicorn main:app --host 0.0.0.0 --port 8000
+    ```
 
-### Vercel Steps:
-1.  Connect your GitHub repository.
-2.  Vercel will detect it as a Vite project.
-3.  **Root Directory**: Set this to `frontend`.
-4.  **Environment Variables**:
-    - `VITE_API_URL`: (The URL of your deployed Render backend)
-5.  Click **Deploy**.
+### Frontend (Nginx)
+1.  **Build**:
+    ```bash
+    cd frontend
+    npm install
+    VITE_API_URL=http://your-server-ip:8000 npm run build
+    ```
+2.  **Serve**: Move the `dist` folder to your web server root (e.g., `/var/www/html`) and configure Nginx:
+    ```nginx
+    server {
+        listen 80;
+        location / {
+            root /var/www/html/dist;
+            try_files $uri $uri/ /index.html;
+        }
+    }
+    ```
 
-## 4. Maintenance & Security 🛡️
-
-- **API Token**: Never commit your Jira Token. If you accidentally expose it, regenerate it immediately at [Atlassian Security](https://id.atlassian.com/manage-profile/security/api-tokens).
+## 5. Maintenance & Security 🛡️
+- **API Token**: Never commit your Jira Token.
 - **CORS**: The backend only allows requests from the URL defined in your `FRONTEND_URL` variable.
 
 ---

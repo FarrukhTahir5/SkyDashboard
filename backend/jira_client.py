@@ -21,36 +21,71 @@ class JiraClient:
         if not self.token:
             return {"issues": []}
 
-        real_max = max(1, max_results)
+    async def _search_jql(self, jql: str, fields: list = None, max_results: int = 50):
+        if not self.token:
+            return {"issues": [], "total": 0}
+
+        all_issues = []
+        next_token = None
+        page_size = 100
+
+        # Handle comma-separated projects
+        if "project =" in jql:
+            import re
+            match = re.search(r"project\s*=\s*(['\"]?)([^'\"\s&]+)\1", jql)
+            if match:
+                p_val = match.group(2)
+                if "," in p_val:
+                    p_list = [p.strip() for p in p_val.split(",")]
+                    p_in = "project in (" + ",".join([f"'{p}'" for p in p_list]) + ")"
+                    jql = jql.replace(match.group(0), p_in)
 
         async with httpx.AsyncClient() as client:
             try:
-                # Switching to /rest/api/3/search/jql as per user request and error messages
                 url = self.base_url.replace("/api/2", "/api/3") + "/search/jql"
                 
-                payload = {
-                    "jql": jql,
-                    "fields": fields or ["summary", "status", "assignee", "priority", "created", "duedate", "components", "issuetype"],
-                    "maxResults": real_max
-                }
+                while len(all_issues) < max_results:
+                    payload = {
+                        "jql": jql,
+                        "fields": fields or ["summary", "status", "assignee", "priority", "created", "resolutiondate", "parent", "project"],
+                        "maxResults": min(page_size, max_results - len(all_issues))
+                    }
+                    if next_token:
+                        payload["nextPageToken"] = next_token
 
-                response = await client.post(
-                    url,
-                    auth=self.auth,
-                    json=payload,
-                    headers=self.headers,
-                    timeout=10.0
-                )
-                
-                if response.status_code >= 400:
-                    print(f"DEBUG: {response.status_code} ERROR for JQL: {jql}")
-                    print(f"DEBUG: Response: {response.text}")
-                
-                response.raise_for_status()
-                return response.json()
+                    response = await client.post(
+                        url,
+                        auth=self.auth,
+                        json=payload,
+                        headers=self.headers,
+                        timeout=15.0
+                    )
+                    
+                    if response.status_code >= 400:
+                        print(f"DEBUG: {response.status_code} ERROR for JQL: {jql}")
+                        print(f"DEBUG: Response: {response.text}")
+                        break
+                    
+                    response.raise_for_status()
+                    data = response.json()
+                    
+                    issues = data.get("issues", [])
+                    if not issues:
+                        break
+                        
+                    all_issues.extend(issues)
+                    
+                    if data.get("isLast") is True:
+                        break
+                        
+                    next_token = data.get("nextPageToken")
+                    if not next_token:
+                        break
+
+                return {"issues": all_issues, "total": len(all_issues)}
             except Exception as e:
                 print(f"Jira API Error: {e}")
-                return {"issues": []}
+                return {"issues": all_issues, "total": len(all_issues)}
 
     async def get_projects(self):
         if not self.token: return []
@@ -766,3 +801,164 @@ class JiraClient:
         # Sort by count desc
         result.sort(key=lambda x: x["count"], reverse=True)
         return result[:10] # Top 10 flows
+
+    async def get_bug_stats_by_epics(self):
+        """Fetch bug statistics for specific epics (App, Cloud, PCS) across projects"""
+        # Epic mappings based on user info
+        epic_map = {
+            "APP": [84757, 84760],
+            "CLOUD": [84756, 84759],
+            "PCS": [84758, 84793]
+        }
+        
+        all_ids = []
+        for ids in epic_map.values():
+            all_ids.extend(ids)
+            
+        epic_ids_str = ",".join(map(str, all_ids))
+        main_jql = f"parent in ({epic_ids_str}) AND issuetype = Bug AND createdDate >= '2024-01-01'"
+        
+        # Provide exact JQLs for user verification
+        jql_queries = {
+            "APP": f"parent in (84757, 84760) AND issuetype = Bug AND createdDate >= '2024-01-01'",
+            "CLOUD": f"parent in (84756, 84759) AND issuetype = Bug AND createdDate >= '2024-01-01'",
+            "PCS": f"parent in (84758, 84793) AND issuetype = Bug AND createdDate >= '2024-01-01'"
+        }
+        
+        # Fetch data including status and priority
+        # We increase max_results just in case there are many bugs across history
+        data = await self._search_jql(main_jql, fields=["created", "resolutiondate", "parent", "status", "priority"], max_results=2000)
+        
+        timeline_data = {} # date -> {APP: 0, CLOUD: 0, PCS: 0}
+        totals = {"APP": 0, "CLOUD": 0, "PCS": 0}
+        
+        # breakdown: {category: {done: 0, open: 0, priorities: {}, total: 0, fix_time_total_hours: 0}}
+        breakdown = {cat: {"done": 0, "open": 0, "priorities": {}, "total": 0, "fix_time_total_hours": 0} for cat in epic_map.keys()}
+        
+        from datetime import datetime, timedelta
+        
+        for issue in data.get("issues", []):
+            fields = issue.get("fields", {})
+            created = fields.get("created", "")
+            if not created: continue
+            
+            date_str = created.split("T")[0]
+            
+            # Identify category based on parent ID
+            parent = fields.get("parent", {})
+            parent_id = int(parent.get("id")) if parent.get("id") else None
+            
+            category = None
+            for cat, ids in epic_map.items():
+                if parent_id in ids:
+                    category = cat
+                    break
+            
+            if category:
+                # All-time totals and breakdown
+                totals[category] += 1
+                breakdown[category]["total"] += 1
+                
+                status_cat = fields.get("status", {}).get("statusCategory", {}).get("name", "To Do")
+                if status_cat == "Done":
+                    breakdown[category]["done"] += 1
+                    
+                    # Calculate fix time if resolved
+                    resolution = fields.get("resolutiondate")
+                    if resolution:
+                        try:
+                            created_dt = datetime.strptime(created[:19], "%Y-%m-%dT%H:%M:%S")
+                            resolved_dt = datetime.strptime(resolution[:19], "%Y-%m-%dT%H:%M:%S")
+                            diff = resolved_dt - created_dt
+                            hours = diff.total_seconds() / 3600
+                            if hours > 0:
+                                breakdown[category]["fix_time_total_hours"] += hours
+                        except Exception:
+                            pass
+                else:
+                    breakdown[category]["open"] += 1
+                    
+                priority = fields.get("priority", {}).get("name", "Medium")
+                breakdown[category]["priorities"][priority] = breakdown[category]["priorities"].get(priority, 0) + 1
+                
+                # Daily counts for timeline
+                if date_str not in timeline_data:
+                    timeline_data[date_str] = {"APP": 0, "CLOUD": 0, "PCS": 0}
+                timeline_data[date_str][category] += 1
+                
+        # Generate last 90 days timeline
+        today = datetime.now()
+        start_date = today - timedelta(days=89)
+        
+        timeline = []
+        for i in range(90):
+            d = (start_date + timedelta(days=i)).strftime("%Y-%m-%d")
+            counts = timeline_data.get(d, {"APP": 0, "CLOUD": 0, "PCS": 0})
+            timeline.append({
+                "date": d,
+                "displayDate": (start_date + timedelta(days=i)).strftime("%d %b"),
+                "APP": counts.get("APP", 0),
+                "CLOUD": counts.get("CLOUD", 0),
+                "PCS": counts.get("PCS", 0)
+            })
+            
+        return {
+            "totals": totals,
+            "timeline": timeline,
+            "breakdown": breakdown,
+            "jql_queries": jql_queries
+        }
+    async def get_sprint_timeline(self, board_ids: list = [50, 140]) -> list:
+        """Fetch sprints for specific boards and format for timeline"""
+        all_sprints = []
+        
+        async with httpx.AsyncClient() as client:
+            for board_id in board_ids:
+                try:
+                    # Fetch Board Name first
+                    board_url = f"https://{self.domain}/rest/agile/1.0/board/{board_id}"
+                    board_res = await client.get(board_url, auth=self.auth, headers=self.headers, timeout=10.0)
+                    board_name = "Unknown Board"
+                    if board_res.status_code == 200:
+                        raw_name = board_res.json().get("name", "Unknown Board")
+                        # Map names as requested
+                        if "Software Engineering" in raw_name:
+                            board_name = "App/Cloud"
+                        elif "JI board" in raw_name:
+                            board_name = "PCS"
+                        else:
+                            board_name = raw_name
+
+                    # Fetch Sprints
+                    url = f"https://{self.domain}/rest/agile/1.0/board/{board_id}/sprint"
+                    response = await client.get(
+                        url,
+                        auth=self.auth,
+                        params={"state": "active", "maxResults": 50},
+                        headers=self.headers,
+                        timeout=10.0
+                    )
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        for s in data.get("values", []):
+                            # We need name, start, end, state
+                            start_date = s.get("startDate")
+                            end_date = s.get("endDate")
+                            
+                            if not start_date or not end_date:
+                                continue
+
+                            all_sprints.append({
+                                "boardName": board_name,
+                                "sprintName": s["name"],
+                                "startDate": start_date,
+                                "endDate": end_date,
+                                "state": s["state"]
+                            })
+                except Exception as e:
+                    print(f"Error fetching timeline for board {board_id}: {e}")
+                    
+        # Sort chronologically by start date
+        all_sprints.sort(key=lambda x: x["startDate"])
+        return all_sprints

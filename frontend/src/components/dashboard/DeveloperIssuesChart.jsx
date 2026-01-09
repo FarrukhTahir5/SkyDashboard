@@ -9,9 +9,9 @@ export function DeveloperIssuesChart({ project, sprintId }) {
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
+    const fetchData = (isSilent = false) => {
         if (!project) return;
-        setLoading(true);
+        if (!isSilent) setLoading(true);
         let url = `${API_URL}/api/dashboard/developer-stats?project=${project}`;
         if (sprintId) url += `&sprint_id=${sprintId}`;
 
@@ -24,6 +24,12 @@ export function DeveloperIssuesChart({ project, sprintId }) {
                 setData([]);
             })
             .finally(() => setLoading(false));
+    };
+
+    useEffect(() => {
+        fetchData();
+        const interval = setInterval(() => fetchData(true), 60000);
+        return () => clearInterval(interval);
     }, [project, sprintId]);
 
     // Extract unique status names for Bar elements
@@ -72,6 +78,10 @@ export function DeveloperIssuesChart({ project, sprintId }) {
         return null;
     };
 
+    // Calculate dynamic height based on data length
+    const CHART_ROW_HEIGHT = 45;
+    const dynamicHeight = Math.max(120, data.length * CHART_ROW_HEIGHT);
+
     return (
         <Card className="h-full flex flex-col hover:shadow-xl transition-all duration-300 dark:bg-slate-900/50 dark:border-slate-800 animate-shimmer-sweep">
             <CardHeader className="pb-2 border-b border-slate-50 dark:border-slate-800">
@@ -80,58 +90,66 @@ export function DeveloperIssuesChart({ project, sprintId }) {
                         <div className="p-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-md">
                             <Users size={18} />
                         </div>
-                        <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-100 uppercase tracking-tight">Resource Utilization & Capacity Governance</CardTitle>
+                        <CardTitle className="text-[clamp(11px,1cqi,13px)] font-black text-slate-900 dark:text-slate-100 uppercase tracking-tight">Resource Utilization & Capacity Governance</CardTitle>
                     </div>
                 </div>
             </CardHeader>
-            <CardContent className="flex-1 p-2">
-                <div className="h-full min-h-[120px] pb-6">
-                    {loading ? (
-                        <div className="h-full flex items-center justify-center animate-pulse bg-slate-50/50 dark:bg-slate-900/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-800">
-                            <p className="text-sm text-slate-400 font-medium">Analyzing developer capacity...</p>
-                        </div>
-                    ) : data.length > 0 ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={data} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="currentColor" className="text-slate-100 dark:text-slate-800" />
-                                <XAxis type="number" hide />
-                                <YAxis
-                                    dataKey="name"
-                                    type="category"
-                                    tick={{ fontSize: 11, fontWeight: 600, fill: 'currentColor' }}
-                                    className="text-slate-500 dark:text-slate-400"
-                                    width={100}
-                                    axisLine={false}
-                                    tickLine={false}
-                                />
-                                <Tooltip
-                                    cursor={{ fill: 'currentColor', className: 'text-slate-50/50 dark:text-slate-900/30' }}
-                                    content={<CustomTooltip />}
-                                />
-                                <Legend
-                                    verticalAlign="top"
-                                    align="right"
-                                    iconType="circle"
-                                    wrapperStyle={{ fontSize: '10px', paddingBottom: '20px', fontWeight: 'bold', textTransform: 'uppercase' }}
-                                    formatter={(value) => <span className="text-slate-600 dark:text-slate-400">{value}</span>}
-                                />
-                                {statuses.map((status) => (
-                                    <Bar
-                                        key={status}
-                                        dataKey={status}
-                                        stackId="a"
-                                        fill={statusColorMap[status]}
-                                        radius={[0, 0, 0, 0]}
-                                        barSize={24}
+            <CardContent className="flex-1 p-2 overflow-hidden flex flex-col">
+                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
+                    <div style={{ height: `${dynamicHeight}px`, minWidth: '400px' }}>
+                        {loading ? (
+                            <div className="h-full flex items-center justify-center animate-pulse bg-slate-50/50 dark:bg-slate-900/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-800">
+                                <p className="text-sm text-slate-400 font-medium">Analyzing developer capacity...</p>
+                            </div>
+                        ) : data.length > 0 ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={data} layout="vertical" margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="currentColor" className="text-slate-100 dark:text-slate-800" />
+                                    <XAxis type="number" hide />
+                                    <YAxis
+                                        dataKey="name"
+                                        type="category"
+                                        tick={{ fontSize: 10, fontWeight: 800, fill: 'currentColor' }}
+                                        className="text-black dark:text-white"
+                                        width={120}
+                                        axisLine={false}
+                                        tickLine={false}
+                                        interval={0}
                                     />
-                                ))}
-                            </BarChart>
-                        </ResponsiveContainer>
-                    ) : (
-                        <div className="h-full flex items-center justify-center text-slate-500 dark:text-slate-400 font-medium italic text-sm bg-slate-50/30 dark:bg-slate-900/40 border-2 border-dashed border-slate-200 dark:border-slate-800/60 rounded-2xl">
-                            No active developer assignments in this project
-                        </div>
-                    )}
+                                    <Tooltip
+                                        cursor={{ fill: 'currentColor', className: 'text-slate-50/50 dark:text-slate-900/30' }}
+                                        content={<CustomTooltip />}
+                                    />
+                                    <Legend
+                                        verticalAlign="top"
+                                        align="right"
+                                        iconType="circle"
+                                        wrapperStyle={{
+                                            fontSize: '10px',
+                                            paddingBottom: '20px',
+                                            fontWeight: 900,
+                                            textTransform: 'uppercase'
+                                        }}
+                                        formatter={(value) => <span className="text-black dark:text-white tracking-widest">{value}</span>}
+                                    />
+                                    {statuses.map((status) => (
+                                        <Bar
+                                            key={status}
+                                            dataKey={status}
+                                            stackId="a"
+                                            fill={statusColorMap[status]}
+                                            radius={[0, 0, 0, 0]}
+                                            barSize={18}
+                                        />
+                                    ))}
+                                </BarChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div className="h-full flex items-center justify-center text-slate-500 dark:text-slate-400 font-medium italic text-sm bg-slate-50/30 dark:bg-slate-900/40 border-2 border-dashed border-slate-200 dark:border-slate-800/60 rounded-2xl">
+                                No active developer assignments in this project
+                            </div>
+                        )}
+                    </div>
                 </div>
             </CardContent>
         </Card>
