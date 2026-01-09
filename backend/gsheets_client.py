@@ -21,12 +21,12 @@ class GSheetsClient:
             
             try:
                 if env_json:
-                    import json
-                    import base64
+                    # Strip any potential wrapping quotes or whitespace from the raw environment variable
+                    env_json = env_json.strip().strip('"').strip("'")
                     
                     # Log raw input characteristics safely
                     raw_len = len(env_json)
-                    logger.info(f"GSHEETS_JSON found (len: {raw_len}). First 10 chars: {env_json[:10]}...")
+                    logger.info(f"GSHEETS_JSON found (len: {raw_len}). First 10 chars: {env_json[:10]}... Last 10: ...{env_json[-10:]}")
                     
                     creds_dict = None
                     # Try direct JSON first
@@ -36,29 +36,50 @@ class GSheetsClient:
                     except json.JSONDecodeError:
                         logger.info("GSHEETS_JSON is not valid JSON, trying Base64 decode...")
                         try:
-                            decoded = base64.b64decode(env_json).decode('utf-8')
+                            # Remove any internal whitespace that might have been introduced during copy-paste
+                            cleaned_env_json = "".join(env_json.split())
+                            decoded = base64.b64decode(cleaned_env_json).decode('utf-8')
                             creds_dict = json.loads(decoded)
                             logger.info("Successfully parsed GSHEETS_JSON after Base64 decoding")
                         except Exception as b64e:
                             logger.error(f"Failed to parse as Base64: {b64e}")
-                            raise ValueError("GSHEETS_JSON is neither valid JSON nor valid Base64 JSON")
+                            raise ValueError(f"GSHEETS_JSON is neither valid JSON nor valid Base64 JSON. Error: {str(b64e)}")
 
                     if creds_dict and "private_key" in creds_dict:
                         pk = creds_dict["private_key"]
-                        # Handle both literal \n and escaped \\n
-                        if "\\n" in pk:
-                            logger.info("Found literal \\\\n in private key, replacing...")
-                            creds_dict["private_key"] = pk.replace("\\n", "\n")
                         
-                        # Strip extra whitespace/quotes that might have been added by env var managers
-                        # but keep the internal/trailing newlines if they are part of the PEM
-                        creds_dict["private_key"] = creds_dict["private_key"].strip(' "').strip("'")
+                        # Handle potential issues with private key formatting from env vars
+                        if isinstance(pk, str):
+                            # Replace escaped newlines. Some platforms double-escape, so we do it twice to be safe.
+                            pk = pk.replace("\\\\n", "\n").replace("\\n", "\n")
+                            
+                            # Strip extra whitespace, quotes, and carriage returns
+                            # but preserve internal newlines that are now actual \n
+                            pk = pk.strip().strip('"').strip("'").replace("\r", "")
+                            
+                            # Ensure the key has the correct PEM boundaries and internal structure
+                            # JWT Signature issues often come from missing trailing newlines or extra spaces
+                            if "-----BEGIN PRIVATE KEY-----" in pk and not pk.endswith("\n"):
+                                pk += "\n"
+                                
+                            creds_dict["private_key"] = pk
                         
                         logger.info(f"Processed private key. Length: {len(creds_dict['private_key'])}")
                         logger.info(f"Key starts with: {creds_dict['private_key'][:30]}...")
+                        logger.info(f"Key ends with: ...{creds_dict['private_key'][-30:].replace('\n', '\\n')}")
                     
-                    self.gc = gspread.service_account_from_dict(creds_dict)
-                    logger.info("GSpread connected successfully via environment variable")
+                    try:
+                        self.gc = gspread.service_account_from_dict(creds_dict)
+                        logger.info("GSpread connected successfully")
+                    except Exception as sa_err:
+                        err_msg = str(sa_err)
+                        logger.error(f"Service account connection failed: {err_msg}")
+                        if "invalid_grant" in err_msg or "Signature verification failed" in err_msg:
+                            raise ValueError(
+                                "Invalid JWT Signature. This usually means the private key is mangled or doesn't match the service account email. "
+                                "TIP: Use the Base64 output from 'prepare_deploy.py' and ensure no extra quotes are added in Render settings."
+                            )
+                        raise ValueError(f"Google Auth Error: {err_msg}")
                 else:
                     target_path = env_path if env_path else self.json_path
                     logger.info(f"GSHEETS_JSON not found. Falling back to: {target_path}")
