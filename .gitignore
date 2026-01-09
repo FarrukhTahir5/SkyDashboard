@@ -49,5 +49,5 @@ Thumbs.db
 .idea/
 .cursor/
 backend/jira_client.py.backup
-backend/*.json
+# backend/*.json
 frontend/dist/
