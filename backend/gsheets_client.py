@@ -16,10 +16,21 @@ class GSheetsClient:
 
     def _connect(self):
         if not self.gc:
-            if not os.path.exists(self.json_path):
-                logger.error(f"Service account JSON not found at {self.json_path}")
-                raise FileNotFoundError(f"Credentials not found at {self.json_path}")
-            self.gc = gspread.service_account(filename=self.json_path)
+            env_json = os.getenv("GSHEETS_JSON")
+            env_path = os.getenv("GSHEETS_JSON_PATH")
+            
+            if env_json:
+                import json
+                creds_dict = json.loads(env_json)
+                self.gc = gspread.service_account_from_dict(creds_dict)
+                logger.info("Connected to GSheets using environment variable")
+            else:
+                target_path = env_path if env_path else self.json_path
+                if not os.path.exists(target_path):
+                    logger.error(f"Credentials not found at {target_path}")
+                    raise FileNotFoundError(f"Credentials not found at {target_path}")
+                self.gc = gspread.service_account(filename=target_path)
+                logger.info(f"Connected to GSheets using file: {target_path}")
         return self.gc
 
     def _get_all_values_sync(self, tab_name):
