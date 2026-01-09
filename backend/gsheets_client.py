@@ -22,6 +22,9 @@ class GSheetsClient:
             if env_json:
                 import json
                 creds_dict = json.loads(env_json)
+                # Fix for Vercel/Render environment variables where newlines in private_key are escaped
+                if "private_key" in creds_dict:
+                    creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
                 self.gc = gspread.service_account_from_dict(creds_dict)
                 logger.info("Connected to GSheets using environment variable")
             else:
