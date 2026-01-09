@@ -50,25 +50,45 @@ class GSheetsClient:
                     if creds_dict and "private_key" in creds_dict:
                         pk = creds_dict["private_key"]
                         
-                        # Handle potential issues with private key formatting from env vars
                         if isinstance(pk, str):
-                            # Replace escaped newlines. Some platforms double-escape, so we do it twice to be safe.
+                            # 1. First, handle escaped or double-escaped newlines
                             pk = pk.replace("\\\\n", "\n").replace("\\n", "\n")
                             
-                            # Strip extra whitespace, quotes, and carriage returns
-                            # but preserve internal newlines that are now actual \n
+                            # 2. Strip surrounding artifacts
                             pk = pk.strip().strip('"').strip("'").replace("\r", "")
                             
-                            # Ensure the key has the correct PEM boundaries and internal structure
-                            # JWT Signature issues often come from missing trailing newlines or extra spaces
-                            if "-----BEGIN PRIVATE KEY-----" in pk and not pk.endswith("\n"):
-                                pk += "\n"
-                                
+                            # 3. Handle cases where newlines might have been turned into spaces
+                            # This is common in some env var managers. 
+                            # If we see the markers but no internal newlines, we need to fix it.
+                            if "-----BEGIN PRIVATE KEY-----" in pk and "\n" not in pk[30:-30]:
+                                logger.warning("Private key appears to have lost its internal newlines. Attempting to fix...")
+                                # Remove header/footer, strip spaces, then re-format
+                                header = "-----BEGIN PRIVATE KEY-----"
+                                footer = "-----END PRIVATE KEY-----"
+                                content = pk.replace(header, "").replace(footer, "").replace(" ", "").strip()
+                                # Rebuild with proper 64-char lines
+                                lines = [content[i:i+64] for i in range(0, len(content), 64)]
+                                pk = f"{header}\n" + "\n".join(lines) + f"\n{footer}\n"
+                            
+                            # 4. Final safety checks
+                            if "-----BEGIN PRIVATE KEY-----" in pk:
+                                if not pk.strip().endswith("-----END PRIVATE KEY-----"):
+                                   pk = pk.strip() + "\n-----END PRIVATE KEY-----\n"
+                                if not pk.endswith("\n"):
+                                    pk += "\n"
+                            
                             creds_dict["private_key"] = pk
                         
-                        logger.info(f"Processed private key. Length: {len(creds_dict['private_key'])}")
-                        logger.info(f"Key starts with: {creds_dict['private_key'][:30]}...")
-                        logger.info(f"Key ends with: ...{creds_dict['private_key'][-30:].replace('\n', '\\n')}")
+                        # Detailed (but safe) diagnostics
+                        pk_len = len(creds_dict['private_key'])
+                        pk_lines = creds_dict['private_key'].count("\n")
+                        logger.info(f"Processed private key. Len: {pk_len}, Lines: {pk_lines}")
+                        logger.info(f"Key starts: {repr(creds_dict['private_key'][:40])}")
+                        logger.info(f"Key ends: {repr(creds_dict['private_key'][-40:])}")
+                        
+                        if pk_lines < 10:
+                            logger.warning("ALARM: Private key has very few lines. This usually causes 'Invalid JWT Signature'.")
+
                     
                     try:
                         self.gc = gspread.service_account_from_dict(creds_dict)
