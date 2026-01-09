@@ -22,38 +22,50 @@ class GSheetsClient:
             try:
                 if env_json:
                     import json
-                    logger.info("GSHEETS_JSON env var found, attempting to parse...")
-                    creds_dict = json.loads(env_json)
+                    import base64
                     
-                    if "private_key" in creds_dict:
+                    # Log raw input characteristics safely
+                    raw_len = len(env_json)
+                    logger.info(f"GSHEETS_JSON found (len: {raw_len}). First 10 chars: {env_json[:10]}...")
+                    
+                    creds_dict = None
+                    # Try direct JSON first
+                    try:
+                        creds_dict = json.loads(env_json)
+                        logger.info("Successfully parsed GSHEETS_JSON as direct JSON")
+                    except json.JSONDecodeError:
+                        logger.info("GSHEETS_JSON is not valid JSON, trying Base64 decode...")
+                        try:
+                            decoded = base64.b64decode(env_json).decode('utf-8')
+                            creds_dict = json.loads(decoded)
+                            logger.info("Successfully parsed GSHEETS_JSON after Base64 decoding")
+                        except Exception as b64e:
+                            logger.error(f"Failed to parse as Base64: {b64e}")
+                            raise ValueError("GSHEETS_JSON is neither valid JSON nor valid Base64 JSON")
+
+                    if creds_dict and "private_key" in creds_dict:
                         pk = creds_dict["private_key"]
-                        logger.info(f"Private key found in JSON. Length: {len(pk)}")
+                        # Handle both literal \n and escaped \\n
                         if "\\n" in pk:
-                            logger.info("Found literal \\\\n in private key, replacing with actual newlines")
+                            logger.info("Found literal \\\\n in private key, replacing...")
                             creds_dict["private_key"] = pk.replace("\\n", "\n")
-                        else:
-                            logger.info("No literal \\\\n found in private key.")
                         
-                        # Safe debug: show start/end of processed key
-                        processed_pk = creds_dict["private_key"]
-                        logger.info(f"Processed key starts with: {processed_pk[:30]}...")
-                        logger.info(f"Processed key ends with: ...{processed_pk[-30:].strip()}")
-                    else:
-                        logger.warning("private_key NOT found in GSHEETS_JSON")
+                        # Strip extra whitespace/quotes that might have been added by env var managers
+                        # but keep the internal/trailing newlines if they are part of the PEM
+                        creds_dict["private_key"] = creds_dict["private_key"].strip(' "').strip("'")
                         
+                        logger.info(f"Processed private key. Length: {len(creds_dict['private_key'])}")
+                        logger.info(f"Key starts with: {creds_dict['private_key'][:30]}...")
+                    
                     self.gc = gspread.service_account_from_dict(creds_dict)
-                    logger.info("Connected to GSheets using environment variable successfully")
+                    logger.info("GSpread connected successfully via environment variable")
                 else:
                     target_path = env_path if env_path else self.json_path
-                    logger.info(f"GSHEETS_JSON not found. Falling back to file: {target_path}")
-                    if not os.path.exists(target_path):
-                        logger.error(f"Credentials file not found at {target_path}")
-                        raise FileNotFoundError(f"Credentials not found at {target_path}")
+                    logger.info(f"GSHEETS_JSON not found. Falling back to: {target_path}")
                     self.gc = gspread.service_account(filename=target_path)
-                    logger.info(f"Connected to GSheets using file: {target_path} successfully")
+                    logger.info(f"GSpread connected successfully via file: {target_path}")
             except Exception as e:
-                logger.error(f"CRITICAL: Failed to connect to GSheets: {str(e)}")
-                # Log full error for user to see in Render/Vercel logs
+                logger.error(f"CRITICAL Authentication Error: {str(e)}")
                 import traceback
                 logger.error(traceback.format_exc())
                 raise e
