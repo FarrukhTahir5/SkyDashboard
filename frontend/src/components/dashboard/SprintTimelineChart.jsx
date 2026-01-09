@@ -115,8 +115,6 @@ export function SprintTimelineChart() {
                     </div>
                     <div className="hidden sm:flex items-center gap-4 text-[9px] font-black uppercase tracking-widest text-slate-400">
                         <div className="flex items-center gap-1.5"><div className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Active</div>
-                        {/* <div className="flex items-center gap-1.5"><div className="h-1.5 w-1.5 rounded-full bg-blue-500" /> Future</div>
-                        <div className="flex items-center gap-1.5"><div className="h-1.5 w-1.5 rounded-full bg-slate-400" /> Closed</div> */}
                     </div>
                 </div>
             </CardHeader>
