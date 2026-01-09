@@ -19,21 +19,45 @@ class GSheetsClient:
             env_json = os.getenv("GSHEETS_JSON")
             env_path = os.getenv("GSHEETS_JSON_PATH")
             
-            if env_json:
-                import json
-                creds_dict = json.loads(env_json)
-                # Fix for Vercel/Render environment variables where newlines in private_key are escaped
-                if "private_key" in creds_dict:
-                    creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
-                self.gc = gspread.service_account_from_dict(creds_dict)
-                logger.info("Connected to GSheets using environment variable")
-            else:
-                target_path = env_path if env_path else self.json_path
-                if not os.path.exists(target_path):
-                    logger.error(f"Credentials not found at {target_path}")
-                    raise FileNotFoundError(f"Credentials not found at {target_path}")
-                self.gc = gspread.service_account(filename=target_path)
-                logger.info(f"Connected to GSheets using file: {target_path}")
+            try:
+                if env_json:
+                    import json
+                    logger.info("GSHEETS_JSON env var found, attempting to parse...")
+                    creds_dict = json.loads(env_json)
+                    
+                    if "private_key" in creds_dict:
+                        pk = creds_dict["private_key"]
+                        logger.info(f"Private key found in JSON. Length: {len(pk)}")
+                        if "\\n" in pk:
+                            logger.info("Found literal \\\\n in private key, replacing with actual newlines")
+                            creds_dict["private_key"] = pk.replace("\\n", "\n")
+                        else:
+                            logger.info("No literal \\\\n found in private key.")
+                        
+                        # Safe debug: show start/end of processed key
+                        processed_pk = creds_dict["private_key"]
+                        logger.info(f"Processed key starts with: {processed_pk[:30]}...")
+                        logger.info(f"Processed key ends with: ...{processed_pk[-30:].strip()}")
+                    else:
+                        logger.warning("private_key NOT found in GSHEETS_JSON")
+                        
+                    self.gc = gspread.service_account_from_dict(creds_dict)
+                    logger.info("Connected to GSheets using environment variable successfully")
+                else:
+                    target_path = env_path if env_path else self.json_path
+                    logger.info(f"GSHEETS_JSON not found. Falling back to file: {target_path}")
+                    if not os.path.exists(target_path):
+                        logger.error(f"Credentials file not found at {target_path}")
+                        raise FileNotFoundError(f"Credentials not found at {target_path}")
+                    self.gc = gspread.service_account(filename=target_path)
+                    logger.info(f"Connected to GSheets using file: {target_path} successfully")
+            except Exception as e:
+                logger.error(f"CRITICAL: Failed to connect to GSheets: {str(e)}")
+                # Log full error for user to see in Render/Vercel logs
+                import traceback
+                logger.error(traceback.format_exc())
+                raise e
+                
         return self.gc
 
     def _get_all_values_sync(self, tab_name):
