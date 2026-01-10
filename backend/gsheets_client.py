@@ -23,6 +23,9 @@ class GSheetsClient:
             
             try:
                 if env_json:
+                    # Log system time to check for clock skew
+                    logger.info(f"System Time (UTC): {datetime.datetime.utcnow().isoformat()}")
+                    
                     # Strip any potential wrapping quotes or whitespace from the raw environment variable
                     env_json = env_json.strip().strip('"').strip("'")
                     
@@ -47,61 +50,62 @@ class GSheetsClient:
                             logger.error(f"Failed to parse as Base64: {b64e}")
                             raise ValueError(f"GSHEETS_JSON is neither valid JSON nor valid Base64 JSON. Error: {str(b64e)}")
 
-                    if creds_dict and "private_key" in creds_dict:
-                        pk = creds_dict["private_key"]
-                        
-                        if isinstance(pk, str):
-                            # 1. First, handle escaped or double-escaped newlines
-                            pk = pk.replace("\\\\n", "\n").replace("\\n", "\n")
+                    if creds_dict:
+                        # Clean email
+                        if "client_email" in creds_dict:
+                            creds_dict["client_email"] = creds_dict["client_email"].strip()
+                            logger.info(f"Using identity: {creds_dict['client_email']}")
+
+                        if "private_key" in creds_dict:
+                            pk = creds_dict["private_key"]
                             
-                            # 2. Strip surrounding artifacts
-                            pk = pk.strip().strip('"').strip("'").replace("\r", "")
+                            if isinstance(pk, str):
+                                # 1. First, handle escaped or double-escaped newlines
+                                pk = pk.replace("\\\\n", "\n").replace("\\n", "\n")
+                                
+                                # 2. Strip surrounding artifacts
+                                pk = pk.strip().strip('"').strip("'").replace("\r", "")
+                                
+                                # 3. Handle cases where newlines might have been turned into spaces
+                                # This is common in some env var managers. 
+                                # If we see the markers but no internal newlines, we need to fix it.
+                                if "-----BEGIN PRIVATE KEY-----" in pk and "\n" not in pk[30:-30]:
+                                    logger.warning("Private key appears to have lost its internal newlines. Attempting to fix...")
+                                    # Remove header/footer, strip spaces, then re-format
+                                    header = "-----BEGIN PRIVATE KEY-----"
+                                    footer = "-----END PRIVATE KEY-----"
+                                    content = pk.replace(header, "").replace(footer, "").replace(" ", "").strip()
+                                    # Rebuild with proper 64-char lines
+                                    lines = [content[i:i+64] for i in range(0, len(content), 64)]
+                                    pk = f"{header}\n" + "\n".join(lines) + f"\n{footer}\n"
+                                
+                                # 4. Final safety checks
+                                if "-----BEGIN PRIVATE KEY-----" in pk:
+                                    if not pk.strip().endswith("-----END PRIVATE KEY-----"):
+                                       pk = pk.strip() + "\n-----END PRIVATE KEY-----\n"
+                                    if not pk.endswith("\n"):
+                                        pk += "\n"
+                                
+                                creds_dict["private_key"] = pk
                             
-                            # 3. Handle cases where newlines might have been turned into spaces
-                            # This is common in some env var managers. 
-                            # If we see the markers but no internal newlines, we need to fix it.
-                            if "-----BEGIN PRIVATE KEY-----" in pk and "\n" not in pk[30:-30]:
-                                logger.warning("Private key appears to have lost its internal newlines. Attempting to fix...")
-                                # Remove header/footer, strip spaces, then re-format
-                                header = "-----BEGIN PRIVATE KEY-----"
-                                footer = "-----END PRIVATE KEY-----"
-                                content = pk.replace(header, "").replace(footer, "").replace(" ", "").strip()
-                                # Rebuild with proper 64-char lines
-                                lines = [content[i:i+64] for i in range(0, len(content), 64)]
-                                pk = f"{header}\n" + "\n".join(lines) + f"\n{footer}\n"
+                            # Detailed (but safe) diagnostics
+                            pk_len = len(creds_dict['private_key'])
+                            pk_lines = creds_dict['private_key'].count("\n")
+                            logger.info(f"Processed private key. Len: {pk_len}, Lines: {pk_lines}")
+                            logger.info(f"Key starts: {repr(creds_dict['private_key'][:40])}")
+                            logger.info(f"Key ends: {repr(creds_dict['private_key'][-40:])}")
                             
-                            # 4. Final safety checks
-                            if "-----BEGIN PRIVATE KEY-----" in pk:
-                                if not pk.strip().endswith("-----END PRIVATE KEY-----"):
-                                   pk = pk.strip() + "\n-----END PRIVATE KEY-----\n"
-                                if not pk.endswith("\n"):
-                                    pk += "\n"
-                            
-                            creds_dict["private_key"] = pk
-                        
-                        # Detailed (but safe) diagnostics
-                        pk_len = len(creds_dict['private_key'])
-                        pk_lines = creds_dict['private_key'].count("\n")
-                        logger.info(f"Processed private key. Len: {pk_len}, Lines: {pk_lines}")
-                        logger.info(f"Key starts: {repr(creds_dict['private_key'][:40])}")
-                        logger.info(f"Key ends: {repr(creds_dict['private_key'][-40:])}")
-                        
-                        if pk_lines < 10:
-                            logger.warning("ALARM: Private key has very few lines. This usually causes 'Invalid JWT Signature'.")
+                            if pk_lines < 10:
+                                logger.warning("ALARM: Private key has very few lines. This usually causes 'Invalid JWT Signature'.")
 
                     
                     try:
                         self.gc = gspread.service_account_from_dict(creds_dict)
-                        logger.info("GSpread connected successfully")
+                        logger.info("GSpread initialized successfully")
                     except Exception as sa_err:
                         err_msg = str(sa_err)
-                        logger.error(f"Service account connection failed: {err_msg}")
-                        if "invalid_grant" in err_msg or "Signature verification failed" in err_msg:
-                            raise ValueError(
-                                "Invalid JWT Signature. This usually means the private key is mangled or doesn't match the service account email. "
-                                "TIP: Use the Base64 output from 'prepare_deploy.py' and ensure no extra quotes are added in Render settings."
-                            )
-                        raise ValueError(f"Google Auth Error: {err_msg}")
+                        logger.error(f"Service account initialization failed: {err_msg}")
+                        raise ValueError(f"Google Auth Initialization Error: {err_msg}")
                 else:
                     target_path = env_path if env_path else self.json_path
                     logger.info(f"GSHEETS_JSON not found. Falling back to: {target_path}")
