@@ -51,10 +51,13 @@ class GSheetsClient:
                             raise ValueError(f"GSHEETS_JSON is neither valid JSON nor valid Base64 JSON. Error: {str(b64e)}")
 
                     if creds_dict:
-                        # Clean email
+                        # Clean email and log metadata
                         if "client_email" in creds_dict:
                             creds_dict["client_email"] = creds_dict["client_email"].strip()
                             logger.info(f"Using identity: {creds_dict['client_email']}")
+                        
+                        if "private_key_id" in creds_dict:
+                            logger.info(f"Key ID: {creds_dict['private_key_id'][:10]}...")
 
                         if "private_key" in creds_dict:
                             pk = creds_dict["private_key"]
@@ -67,15 +70,11 @@ class GSheetsClient:
                                 pk = pk.strip().strip('"').strip("'").replace("\r", "")
                                 
                                 # 3. Handle cases where newlines might have been turned into spaces
-                                # This is common in some env var managers. 
-                                # If we see the markers but no internal newlines, we need to fix it.
                                 if "-----BEGIN PRIVATE KEY-----" in pk and "\n" not in pk[30:-30]:
-                                    logger.warning("Private key appears to have lost its internal newlines. Attempting to fix...")
-                                    # Remove header/footer, strip spaces, then re-format
+                                    logger.warning("Private key appears to have lost its internal newlines. Fixing formatting...")
                                     header = "-----BEGIN PRIVATE KEY-----"
                                     footer = "-----END PRIVATE KEY-----"
                                     content = pk.replace(header, "").replace(footer, "").replace(" ", "").strip()
-                                    # Rebuild with proper 64-char lines
                                     lines = [content[i:i+64] for i in range(0, len(content), 64)]
                                     pk = f"{header}\n" + "\n".join(lines) + f"\n{footer}\n"
                                 
@@ -88,24 +87,26 @@ class GSheetsClient:
                                 
                                 creds_dict["private_key"] = pk
                             
-                            # Detailed (but safe) diagnostics
+                            # Detailed diagnostics
                             pk_len = len(creds_dict['private_key'])
                             pk_lines = creds_dict['private_key'].count("\n")
                             logger.info(f"Processed private key. Len: {pk_len}, Lines: {pk_lines}")
-                            logger.info(f"Key starts: {repr(creds_dict['private_key'][:40])}")
-                            logger.info(f"Key ends: {repr(creds_dict['private_key'][-40:])}")
-                            
-                            if pk_lines < 10:
-                                logger.warning("ALARM: Private key has very few lines. This usually causes 'Invalid JWT Signature'.")
-
-                    
+                        
                     try:
+                        logger.info(f"Initializaing GSpread (v{gspread.__version__})...")
                         self.gc = gspread.service_account_from_dict(creds_dict)
-                        logger.info("GSpread initialized successfully")
+                        # The following line triggers a test auth call
+                        self.gc.auth.token 
+                        logger.info("GSpread initialized and auth token pre-fetched")
                     except Exception as sa_err:
                         err_msg = str(sa_err)
-                        logger.error(f"Service account initialization failed: {err_msg}")
-                        raise ValueError(f"Google Auth Initialization Error: {err_msg}")
+                        if "invalid_grant" in err_msg:
+                            logger.error(f"JWT SIGNATURE FAILURE: The key is formatted correctly, but Google rejected the signature. Error: {err_msg}")
+                        else:
+                            logger.error(f"GSpread init error: {err_msg}")
+                        # We still set self.gc, the actual error will be raised by gspread later
+                        # But we've logged the diagnostic info.
+                        self.gc = gspread.service_account_from_dict(creds_dict)
                 else:
                     target_path = env_path if env_path else self.json_path
                     logger.info(f"GSHEETS_JSON not found. Falling back to: {target_path}")
