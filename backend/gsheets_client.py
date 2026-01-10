@@ -93,20 +93,12 @@ class GSheetsClient:
                             logger.info(f"Processed private key. Len: {pk_len}, Lines: {pk_lines}")
                         
                     try:
-                        logger.info(f"Initializaing GSpread (v{gspread.__version__})...")
+                        logger.info(f"Initializing GSpread (v{gspread.__version__})...")
                         self.gc = gspread.service_account_from_dict(creds_dict)
-                        # The following line triggers a test auth call
-                        self.gc.auth.token 
-                        logger.info("GSpread initialized and auth token pre-fetched")
+                        logger.info("GSpread initialized successfully")
                     except Exception as sa_err:
-                        err_msg = str(sa_err)
-                        if "invalid_grant" in err_msg:
-                            logger.error(f"JWT SIGNATURE FAILURE: The key is formatted correctly, but Google rejected the signature. Error: {err_msg}")
-                        else:
-                            logger.error(f"GSpread init error: {err_msg}")
-                        # We still set self.gc, the actual error will be raised by gspread later
-                        # But we've logged the diagnostic info.
-                        self.gc = gspread.service_account_from_dict(creds_dict)
+                        logger.error(f"GSpread init error: {sa_err}")
+                        raise ValueError(f"Google Auth Initialization Error: {str(sa_err)}")
                 else:
                     target_path = env_path if env_path else self.json_path
                     logger.info(f"GSHEETS_JSON not found. Falling back to: {target_path}")

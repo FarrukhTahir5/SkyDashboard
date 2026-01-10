@@ -49,5 +49,6 @@ Thumbs.db
 .idea/
 .cursor/
 backend/jira_client.py.backup
-# backend/*.json
+backend/*.json
 frontend/dist/
+backend\indigo-coder-466609-a0-903d80189cd0.json
