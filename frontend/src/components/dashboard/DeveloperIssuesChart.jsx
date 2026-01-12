@@ -83,7 +83,7 @@ export function DeveloperIssuesChart({ project, sprintId }) {
     const dynamicHeight = Math.max(120, data.length * CHART_ROW_HEIGHT);
 
     return (
-        <Card className="h-full flex flex-col hover:shadow-xl transition-all duration-300 dark:bg-slate-900/50 dark:border-slate-800 animate-shimmer-sweep">
+        <Card className="h-full flex flex-col hover:shadow-xl transition-all duration-300 dark:bg-slate-900/50 dark:border-slate-800">
             <CardHeader className="pb-2 border-b border-slate-50 dark:border-slate-800">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -96,7 +96,7 @@ export function DeveloperIssuesChart({ project, sprintId }) {
             </CardHeader>
             <CardContent className="flex-1 p-2 overflow-hidden flex flex-col">
                 <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
-                    <div style={{ height: `${dynamicHeight}px`, minWidth: '400px' }}>
+                    <div style={{ height: `${dynamicHeight}px`, minWidth: '100%' }}>
                         {loading ? (
                             <div className="h-full flex items-center justify-center animate-pulse bg-slate-50/50 dark:bg-slate-900/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-800">
                                 <p className="text-sm text-slate-400 font-medium">Analyzing developer capacity...</p>

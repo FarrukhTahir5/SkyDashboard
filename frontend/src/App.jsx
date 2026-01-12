@@ -56,7 +56,8 @@ function App() {
 
       {/* Header: Enhanced for v2 */}
       <header className="flex-none px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl z-20 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 shadow-sm">
-        <div className="flex items-center flex-1 min-w-0">
+        <div className="flex items-center flex-1 min-w-0 gap-6">
+          <img src="/logo.png" alt="SkyElectric Logo" className="h-12 lg:h-16 w-auto object-contain drop-shadow-md" />
           <div className="relative w-full">
             <h1 className="text-[clamp(1.5rem,5cqi,2.5rem)] font-black bg-gradient-to-r from-blue-600 to-indigo-500 dark:from-blue-400 dark:to-indigo-300 bg-clip-text text-transparent tracking-tighter uppercase italic whitespace-nowrap leading-tight w-full">
               Quality Excellence Dashboard

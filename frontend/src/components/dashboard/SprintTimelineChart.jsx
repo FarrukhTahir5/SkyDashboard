@@ -126,7 +126,7 @@ export function SprintTimelineChart() {
                     </div>
                 ) : data.length > 0 ? (
                     <div className="h-full overflow-y-auto custom-scrollbar px-2 py-4">
-                        <div style={{ height: `${dynamicHeight}px`, minWidth: '600px' }}>
+                        <div style={{ height: `${dynamicHeight}px`, width: '100%' }}>
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart
                                     data={data}

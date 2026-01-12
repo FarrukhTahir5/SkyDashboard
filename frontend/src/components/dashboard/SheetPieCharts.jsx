@@ -197,9 +197,6 @@ export const SheetPieCharts = () => {
                         <div className="h-2 w-2 rounded-full bg-blue-600 animate-pulse" />
                         component wise distribution
                     </CardTitle>
-                    <div className="flex items-center gap-2">
-                        <span className="text-[clamp(8px,0.8cqi,10px)] font-black text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full tracking-tighter">SOURCE: PROGRESS_CHECK</span>
-                    </div>
                 </div>
             </CardHeader>
             <CardContent className="flex-1 p-6 grid grid-cols-3 gap-6 overflow-hidden">
