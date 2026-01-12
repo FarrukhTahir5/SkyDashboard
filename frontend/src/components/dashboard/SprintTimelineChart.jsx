@@ -92,11 +92,11 @@ export function SprintTimelineChart() {
         return new Date(tick).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
     };
 
-    const ROW_HEIGHT = 55;
-    const dynamicHeight = Math.max(200, data.length * ROW_HEIGHT);
+    const ROW_HEIGHT = 40;
+    const dynamicHeight = Math.max(120, data.length * ROW_HEIGHT);
 
     return (
-        <Card className="h-full flex flex-col hover:shadow-2xl transition-all duration-500 overflow-hidden dark:bg-slate-900/40 dark:border-slate-800/60 group">
+        <Card className="flex flex-col hover:shadow-2xl transition-all duration-500 overflow-hidden dark:bg-slate-900/40 dark:border-slate-800/60 group">
             <CardHeader className="py-4 px-6 border-b border-slate-100 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-900/50">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">

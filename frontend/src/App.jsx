@@ -12,6 +12,7 @@ import { DeveloperIssuesChart } from './components/dashboard/DeveloperIssuesChar
 import { BoardQualityChart } from './components/dashboard/BoardQualityChart';
 import { BugAssignmentFlow } from './components/dashboard/BugAssignmentFlow';
 import { SprintTimelineChart } from './components/dashboard/SprintTimelineChart';
+import { RemainingItemsCard } from './components/dashboard/RemainingItemsCard';
 import { Sun, Moon, LayoutDashboard, ListTodo, BarChart3, Radio, Server, Cloud, Smartphone, Calendar } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -120,8 +121,9 @@ function App() {
               <div className="col-span-12 lg:col-span-8">
                 <DeveloperIssuesChart project={selectedProject} sprintId={selectedSprint} />
               </div>
-              <div className="col-span-12 lg:col-span-4">
+              <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
                 <SprintTimelineChart />
+                <RemainingItemsCard />
               </div>
             </div>
           </div>

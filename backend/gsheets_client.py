@@ -273,7 +273,8 @@ class GSheetsClient:
                     # Check if development is 0
                     try:
                         if dev_value == "" or dev_value == "0" or float(dev_value) == 0:
-                            remaining_items.append(f"{item_name} ({section_name})")
+                            # Use brackets to avoid confusion with parentheses in the item name itself
+                            remaining_items.append(f"{item_name} [{section_name}]")
                     except ValueError:
                         continue
             
