@@ -699,11 +699,56 @@ class JiraClient:
         if sprint_id:
             jql += f" AND sprint = {sprint_id}"
         
-        data = await self._search_jql(jql, fields=["assignee", "status"], max_results=200)
+        data = await self._search_jql(jql, fields=["assignee", "status"], max_results=3000)
         
+        excluded_developers = {
+            "osama ali jan", "safa.anwar", "shoaib sattar", "muhammad umer qureshi",
+            "nousheen hashmi", "ramsha khan", "saad afzal", "suleman sabbi",
+            "talha nawaz", "usama ikram", "zeeshan haider", "meeraj rasool",
+            "abdullah ishtiaq", "armaghan amed", "asaad javaid bajwa",
+            "fatima noor","muhammad abdullah rehmat","fatima noor gillani","asim hameed khan","sana imtiaz","hafsa tahir","ali kumail","meraj rasool","rubia aamir","sheraz ahmed khan","arsal syed","faheem abbas",
+            "asghar khan", "asim.zia", "basit shabbir", "unassigned",
+            "aabia ather", "abdul samad", "abdul moiz","abdul.moiz","Hafiz Abu Bakar Siddique" , "Sajid Ali" , "raza.kazmi" , "Dr.Saeed ur Rehman" , "Hassan Zahid Butt" , "Mobeen Younis" , "Bilal Ahmed Bhatti" , "Dr.farrukh kamran" , "osama dar","Ali hussan" , "kiran majeed" , "zain-ul- arifeen" , "omer farooq" , "moiz ahmed" , "waqas sajid" , "idress ahmad" , "syed ahmed" , "sumrish hanif" , "maleeha saeed" , "nabeel ahmad" , "saad riaz" , "ziaa" , "junaid_khattak" , "badaruddin bhutto" , "ahmer shafeeq" , "owais nizam" , "ayesha rubab" , "former user" , "jehannaz khan" , "daniyal ali" , "muhammad raza majeed" , "alina alam" , "abdul moeed" , "fazli raziq" , "hina batool" , "muhammad umar bin ali" , "a qadeer qureshi",
+            "naveed ahmad" , "muhammad amir hamza" , "hassan shiraz" , "waqas ali" , "zia ullah bhatti" , "sher afgan butt" , "umer bilal" , "noor" , "sunain malik" ,"danish bhatti" , "amal sultan" , "zahid mehmood" , "haris suhail" , "anam nizami" , "waqas arif" , "dr. saeed ur rehman" , "dr. farrukh kamran" , "sheikh talha" , "wahab zahid" , "zain khalid" , "hammad mushtaq" , "qasim naeem" , "saad sadiq" , "shoaib arslan kiyani","Danyal Sajid"
+
+        }
+        excluded_developers = {d.lower() for d in excluded_developers}
+        
+        # === NEW: Fetch Resolved Stats for Avg Time ===
+        # Fetch resolved bugs/stories in last 60 days
+        jql_resolved = f"project = '{project_key}' AND statusCategory = Done AND resolutiondate >= -60d"
+        data_resolved = await self._search_jql(jql_resolved, fields=["assignee", "created", "resolutiondate"], max_results=2000)
+        
+        fix_times = {} # assignee -> [days_to_fix, ...]
+        
+        from datetime import datetime
+        
+        for issue in data_resolved.get("issues", []):
+            assignee = issue["fields"]["assignee"]["displayName"] if issue["fields"]["assignee"] else "Unassigned"
+            if assignee.lower() in excluded_developers: continue
+                
+            created_str = issue["fields"]["created"]
+            res_str = issue["fields"]["resolutiondate"]
+            
+            if created_str and res_str:
+                try:
+                    c_date = datetime.strptime(created_str.split(".")[0], "%Y-%m-%dT%H:%M:%S")
+                    r_date = datetime.strptime(res_str.split(".")[0], "%Y-%m-%dT%H:%M:%S")
+                    days = (r_date - c_date).total_seconds() / 86400
+                    
+                    if assignee not in fix_times: fix_times[assignee] = []
+                    fix_times[assignee].append(days)
+                except:
+                    pass
+
+        # === Aggregate Unresolved Stats ===
         stats = {} # assignee -> {status -> count}
         for issue in data.get("issues", []):
             assignee = issue["fields"]["assignee"]["displayName"] if issue["fields"]["assignee"] else "Unassigned"
+            # print(assignee)
+            if assignee.lower() in excluded_developers:
+                continue
+
             status = issue["fields"]["status"]["name"]
             
             if assignee not in stats:
@@ -711,7 +756,26 @@ class JiraClient:
             
             stats[assignee][status] = stats[assignee].get(status, 0) + 1
             
-        return list(stats.values())
+        # === Merge & Sort ===
+        result_list = []
+        for assignee, data in stats.items():
+            # Calculate Avg Time
+            times = fix_times.get(assignee, [])
+            avg_time = round(sum(times) / len(times), 1) if times else 0
+            
+            data["avgTime"] = avg_time
+            
+            # Calculate Total for Sorting
+            total = sum(v for k, v in data.items() if k not in ["name", "avgTime"])
+            data["total"] = total
+            result_list.append(data)
+            
+        # Sort by Total Workload Descending
+        result_list.sort(key=lambda x: x["total"], reverse=True)
+            
+        return result_list
+            
+        return result
 
     async def get_board_quality_stats(self, project_id: int):
         """Fetch bug quality metrics (Actual vs Not a Bug) and resolution time per board"""

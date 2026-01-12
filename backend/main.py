@@ -24,8 +24,11 @@ allowed_origins = [
     "http://127.0.0.1:5173",
     "http://localhost:5174",
     "http://127.0.0.1:5174",
+    "http://127.0.0.1:5174",
     "http://localhost:5175",
     "http://127.0.0.1:5175",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
 ]
 
 app.add_middleware(
@@ -155,7 +158,7 @@ async def get_bug_severity_stats(project_id: int, board_id: int = None, days: in
 
 @app.get("/api/dashboard/developer-stats")
 @async_cache(ttl=60)
-async def get_developer_stats(project: str = "SSSS,JI", sprint_id: int = None):
+async def get_developer_stats(project: str = "10123", sprint_id: int = None):
     """Get unresolved issues aggregated by developer and status"""
     return await jira.get_developer_stats(project, sprint_id)
 

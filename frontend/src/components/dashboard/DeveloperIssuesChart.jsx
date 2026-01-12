@@ -61,6 +61,12 @@ export function DeveloperIssuesChart({ project, sprintId }) {
             return (
                 <div className="bg-slate-900 border-slate-800 text-white dark:bg-white dark:border-slate-200 dark:text-slate-900 p-3 rounded-xl shadow-2xl border transition-all duration-200">
                     <p className="font-extrabold text-[12px] uppercase tracking-wider mb-2">{label}</p>
+                    {payload[0]?.payload?.avgTime > 0 && (
+                        <div className="mb-2 pb-2 border-b border-slate-700/50 flex justify-between items-center text-[11px] text-slate-400">
+                            <span>Avg Fix Time:</span>
+                            <span className="font-bold text-white">{payload[0].payload.avgTime} days</span>
+                        </div>
+                    )}
                     <div className="space-y-1">
                         {payload.map((entry, index) => (
                             <div key={index} className="flex items-center justify-between gap-4 text-[11px]">
@@ -109,9 +115,19 @@ export function DeveloperIssuesChart({ project, sprintId }) {
                                     <YAxis
                                         dataKey="name"
                                         type="category"
-                                        tick={{ fontSize: 10, fontWeight: 800, fill: 'currentColor' }}
+                                        tick={({ x, y, payload }) => {
+                                            const item = data.find(d => d.name === payload.value);
+                                            const avgTime = item?.avgTime ? `${item.avgTime}d` : '';
+                                            return (
+                                                <g transform={`translate(${x},${y})`}>
+                                                    <text x={0} y={0} dy={4} textAnchor="end" className="fill-black dark:fill-white text-[10px] font-extrabold">
+                                                        {payload.value} {avgTime && <tspan className="fill-slate-500 font-normal" dx={2}>({avgTime})</tspan>}
+                                                    </text>
+                                                </g>
+                                            );
+                                        }}
                                         className="text-black dark:text-white"
-                                        width={120}
+                                        width={160}
                                         axisLine={false}
                                         tickLine={false}
                                         interval={0}
