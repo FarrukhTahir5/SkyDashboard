@@ -234,4 +234,59 @@ class GSheetsClient:
             logger.error(f"Failed to fetch QA timeline: {e}")
             return {}
 
+    async def get_remaining_dev_items(self):
+        """Fetch items with development = 0 from Sheet1"""
+        try:
+            all_values = await asyncio.to_thread(self._get_all_values_sync, self.tab_name)
+            df = pd.DataFrame(all_values)
+            
+            # Strip whitespace from first column
+            df[0] = df[0].str.strip()
+            
+            remaining_items = []
+            
+            # Process each section (PCS, Cloud, APP)
+            for section_name in ["PCS", "Cloud", "APP"]:
+                matches = df[df[0] == section_name].index
+                if len(matches) == 0:
+                    continue
+                
+                start_idx = matches[0]
+                
+                # Find end of section
+                end_idx = start_idx + 1
+                while end_idx < len(df) and any(df.iloc[end_idx]):
+                    end_idx += 1
+                
+                # Extract rows of the section (skip header at start_idx+1)
+                section_rows = df.iloc[start_idx+2:end_idx]
+                
+                # Filter rows where development (column 1) is 0 or empty
+                for idx, row in section_rows.iterrows():
+                    item_name = str(row[0]).strip()
+                    dev_value = str(row[1]).strip() if len(row) > 1 else ""
+                    
+                    # Skip Average row and empty rows
+                    if not item_name or "Average" in item_name or not item_name:
+                        continue
+                    
+                    # Check if development is 0
+                    try:
+                        if dev_value == "" or dev_value == "0" or float(dev_value) == 0:
+                            remaining_items.append(f"{item_name} ({section_name})")
+                    except ValueError:
+                        continue
+            
+            return {
+                "status": "success",
+                "items": remaining_items
+            }
+        except Exception as e:
+            logger.error(f"Failed to fetch remaining dev items: {e}")
+            return {
+                "status": "error",
+                "error": str(e),
+                "items": []
+            }
+
 gsheets = GSheetsClient()

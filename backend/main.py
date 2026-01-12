@@ -199,3 +199,9 @@ async def get_bug_epic_stats():
 async def get_test_coverage():
     """Get test coverage status from Google Sheets (Sheet 2)"""
     return await gsheets.get_test_coverage()
+
+@app.get("/api/dashboard/remaining-dev-items")
+@async_cache(ttl=60)
+async def get_remaining_dev_items():
+    """Get items with development = 0 from Google Sheets (Sheet 1)"""
+    return await gsheets.get_remaining_dev_items()

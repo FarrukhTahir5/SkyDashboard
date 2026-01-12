@@ -16,6 +16,7 @@ const COLORS = {
 
 export function OverallProgress() {
     const [stats, setStats] = useState({ dev: 0, qa: 0 });
+    const [remainingItems, setRemainingItems] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [isDarkMode, setIsDarkMode] = useState(false);
@@ -30,9 +31,13 @@ export function OverallProgress() {
         const fetchData = async (isSilent = false) => {
             if (!isSilent) setLoading(true);
             try {
-                const response = await axios.get(`${API_URL}/api/dashboard/sheet-progress`);
-                if (response.data.status === 'success') {
-                    const { pcs, cloud, app } = response.data;
+                const [progressResponse, itemsResponse] = await Promise.all([
+                    axios.get(`${API_URL}/api/dashboard/sheet-progress`),
+                    axios.get(`${API_URL}/api/dashboard/remaining-dev-items`)
+                ]);
+
+                if (progressResponse.data.status === 'success') {
+                    const { pcs, cloud, app } = progressResponse.data;
 
                     // Calculate overall averages
                     const devAvg = (pcs.development + cloud.development + app.development) / 3;
@@ -41,7 +46,11 @@ export function OverallProgress() {
                     setStats({ dev: devAvg, qa: qaAvg });
                     setError(null);
                 } else {
-                    setError(response.data.error || 'Failed to fetch sheet data');
+                    setError(progressResponse.data.error || 'Failed to fetch sheet data');
+                }
+
+                if (itemsResponse.data.status === 'success') {
+                    setRemainingItems(itemsResponse.data.items || []);
                 }
             } catch (err) {
                 console.error('Error fetching sheet data for compliance:', err);
@@ -161,6 +170,38 @@ export function OverallProgress() {
                             </span>
                         </div>
                     </div>
+
+                    {/* Scrolling Ticker for Remaining Dev Items */}
+                    {remainingItems.length > 0 && (
+                        <div className="mt-3 w-full overflow-hidden bg-gradient-to-r from-rose-500/5 via-rose-500/10 to-rose-500/5 border border-rose-500/20 rounded-full py-2 shadow-inner">
+                            <div className="ticker-wrapper">
+                                <motion.div
+                                    className="ticker-content flex gap-8 items-center whitespace-nowrap"
+                                    animate={{
+                                        x: [0, -1000]
+                                    }}
+                                    transition={{
+                                        x: {
+                                            repeat: Infinity,
+                                            repeatType: "loop",
+                                            duration: 30,
+                                            ease: "linear"
+                                        }
+                                    }}
+                                >
+                                    {[...remainingItems, ...remainingItems, ...remainingItems].map((item, idx) => (
+                                        <span
+                                            key={idx}
+                                            className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wide inline-flex items-center gap-2"
+                                        >
+                                            <span className="inline-block h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse" />
+                                            {item}
+                                        </span>
+                                    ))}
+                                </motion.div>
+                            </div>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
         </motion.div>
